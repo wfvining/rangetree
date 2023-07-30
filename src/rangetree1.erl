@@ -17,8 +17,6 @@ new(Points) ->
 -spec query(Min :: float(), Max :: float(), Tree :: rangetree1()) -> [pos_integer()].
 query(Min, Max, Tree) when Min =< Max ->
     VSplit = find_vsplit(Min, Max, Tree, 0),
-    %% Collect all leafs to the right of nodes on the path from VSplit
-    %% to VMin
     case array:get(VSplit, Tree) of
         {leaf, X, N} when Min =< X, X =< Max ->
             [N];
