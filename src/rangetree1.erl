@@ -16,58 +16,68 @@ new(Points) ->
 
 -spec query(Min :: float(), Max :: float(), Tree :: rangetree1()) -> [pos_integer()].
 query(Min, Max, Tree) when Min =< Max ->
-    MinIx = find_min(Min, Tree, 0),
-    MaxIx = find_max(Max, Tree, 0),
-    collect_range(MinIx, MaxIx, Tree).
-
-collect_range({MinIx, inclusive}, MaxIx, Tree) ->
-    collect_range(MinIx, MaxIx, Tree, []);
-collect_range({MinIx, exclusive}, MaxIx, Tree) ->
-    collect_range(MinIx + 1, MaxIx, Tree, []).
-
-collect_range(MinIx, {MaxIx, _}, _, Acc)
-  when MinIx > MaxIx ->
-    Acc;
-collect_range(MinIx, {MaxIx, inclusive}, Tree, Acc)
-  when MinIx =:= MaxIx ->
-    {leaf, _, I} = array:get(MinIx, Tree),
-    lists:reverse([I|Acc]);
-collect_range(MinIx, {MaxIx, exclusive}, _, Acc)
-  when MinIx =:= MaxIx ->
-    lists:reverse(Acc);
-collect_range(MinIx, MaxIx, Tree, Acc) ->
-    case array:get(MinIx, Tree) of
-        undefined ->
-            collect_range(MinIx + 1, MaxIx, Tree, Acc);
+    VSplit = find_vsplit(Min, Max, Tree, 0),
+    %% Collect all leafs to the right of nodes on the path from VSplit
+    %% to VMin
+    case array:get(VSplit, Tree) of
+        {leaf, X, N} when Min =< X, X =< Max ->
+            [N];
+        {leaf, _, _} ->
+            [];
         {node, _, _} ->
-            collect_range(MinIx + 1, MaxIx, Tree, Acc);
-        {leaf, _, I} ->
-            collect_range(MinIx + 1, MaxIx, Tree, [I|Acc])
+            Lower = collect_right(Min, Tree, 2 * VSplit + 1),
+            Upper = collect_left(Max, Tree, 2 * VSplit + 2),
+            Lower ++ Upper
     end.
 
-find_max(Max, Tree, I) ->
+collect_left(Max, Tree, I) ->
     case array:get(I, Tree) of
-        {node, X, _} when X >= Max ->
-            find_max(Max, Tree, I * 2 + 1);
+        {leaf, X, N} when X =< Max ->
+            [N];
+        {leaf, _, _} ->
+            [];
         {node, X, _} when X < Max ->
-            find_max(Max, Tree, I * 2 + 2);
-        {leaf, X, _} when X =< Max ->
-            {I, inclusive};
-        {leaf, X, _} when X > Max ->
-            {I, exclusive}
+            collect_left(Max, Tree, 2 * I + 2) ++ leaves(2 * I + 1, Tree);
+        {node, X, _} when X >= Max ->
+            collect_left(Max, Tree, 2 * I + 1)
     end.
 
-find_min(Min, Tree, I) ->
+collect_right(Min, Tree, I) ->
     case array:get(I, Tree) of
+        {leaf, X, N} when Min =< X ->
+            [N];
+        {leaf, _, _} ->
+            [];
+        {node, X, _} when Min =< X ->
+            collect_right(Min, Tree, 2 * I + 1) ++ leaves(2 * I + 2, Tree);
+        {node, X, _} when Min > X ->
+            collect_right(Min, Tree, 2 * I + 2)
+    end.
+
+%% Return all leaves below I.
+leaves(I, Tree) ->
+    case array:get(I, Tree) of
+        {leaf, _, N} ->
+            [N];
+        {node, _, _} ->
+            leaves(2 * I + 1, Tree) ++ leaves(2 * I + 2, Tree)
+    end.
+
+find_vsplit(Min, Max, Tree, I) ->
+    case array:get(I, Tree) of
+        {node, X, _} when X < Max, Min =< X ->
+            %% The paths diverge here, this is VSplit
+            I;
+        {node, X, _} when Max =< X ->
+            %% the range is contained on the left
+            find_vsplit(Min, Max, Tree, 2 * I + 1);
         {node, X, _} when X < Min ->
-            find_min(Min, Tree, I * 2 + 2);
-        {node, X, _} when X >= Min ->
-            find_min(Min, Tree, I * 2 + 1);
-        {leaf, X, _} when X >= Min ->
-            {I, inclusive};
-        {leaf, X, _} when X < Min ->
-            {I, exclusive}
-        end.
+            %% the range is contained on the right
+            find_vsplit(Min, Max, Tree, 2 * I + 2);
+        {leaf, _, _} ->
+            %% If we reached a leaf then that is VSplit
+            I
+    end.
 
 split(List) ->
     split(length(List) div 2, List, []).
