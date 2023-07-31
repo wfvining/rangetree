@@ -8,9 +8,15 @@
 -type rangetree() :: array:array({node, float(), nil | rangetree()} |
                                  {leaf, float(), pos_integer()}).
 
+-if(?OTP_RELEASE >= 25).
+enumerate(L) -> lists:enumerate(L).
+-else.
+enumerate(L) -> lists:zip(lists:seq(1, length(L)), L).
+-endif.
+
 -spec new([[float()]]) -> rangetree().
 new(Points) ->
-    new_tree(lists:enumerate(Points)).
+    new_tree(enumerate(Points)).
 
 -spec query(Min :: [float()], Max :: [float()], Tree :: rangetree()) ->
           [pos_integer()].
