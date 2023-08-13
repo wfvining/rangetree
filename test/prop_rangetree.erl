@@ -7,19 +7,28 @@
 prop_all_covered_in_range() ->
     ?FORALL({Points, {Min, Max}}, tree_and_query(),
         begin
-            T = rangetree1:new(Points),
-            Covered = rangetree1:query(Min, Max, T),
+            T = rangetree:new(Points),
+            Covered = rangetree:query(Min, Max, T),
             {CoveredValues, _NotCoveredValues} = partition_values(Points, Covered),
-            lists:all(fun(X) -> (Min =< X) and (X =< Max) end, CoveredValues)
+            lists:all(
+              fun(P) -> lists:any(
+                          fun({X, XMin, XMax}) -> (XMin =< X) and (X =< XMax) end,
+                          lists:zip3(P, Min, Max))
+              end, CoveredValues)
         end).
 
 prop_all_not_covered_out_of_range() ->
     ?FORALL({Points, {Min, Max}}, tree_and_query(),
         begin
-            T = rangetree1:new(Points),
-            Covered = rangetree1:query(Min, Max, T),
+            T = rangetree:new(Points),
+            Covered = rangetree:query(Min, Max, T),
             {_CoveredValues, NotCoveredValues} = partition_values(Points, Covered),
-            lists:all(fun(X) -> (X > Max) or (X < Min) end, NotCoveredValues)
+            length(Covered) / length(Points),
+            lists:all(
+              fun(P) -> lists:any(
+                          fun({X, XMin, XMax}) -> (X < XMin) or (X > XMax) end,
+                          lists:zip3(P, Min, Max))
+              end, NotCoveredValues)
         end).
 
 %%%%%%%%%%%%%%%
