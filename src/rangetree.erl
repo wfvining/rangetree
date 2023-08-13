@@ -8,6 +8,8 @@
 -type rangetree() :: array:array({node, float(), nil | rangetree()} |
                                  {leaf, float(), pos_integer()}).
 
+-include_lib("eunit/include/eunit.hrl").
+
 -if(?OTP_RELEASE >= 25).
 enumerate(L) -> lists:enumerate(L).
 -else.
@@ -20,7 +22,6 @@ new(Points) ->
 
 -spec query(Min :: [float()], Max :: [float()], Tree :: rangetree()) ->
           [pos_integer()].
-query([], [], _) -> [];
 query([Min|MinRest], [Max|MaxRest], Tree) ->
     VSplit = find_vsplit(Min, Max, Tree, 0),
     case array:get(VSplit, Tree) of
@@ -28,6 +29,10 @@ query([Min|MinRest], [Max|MaxRest], Tree) ->
             [N];
         {leaf, _, _} ->
             [];
+        {node, _, nil} ->
+            Lower = collect_right(Min, Tree, 2 * VSplit + 1),
+            Upper = collect_left(Max, Tree, 2 * VSplit + 2),
+            Lower ++ Upper;
         {node, _, Aux} ->
             Lower = collect_right(Min, Tree, 2 * VSplit + 1),
             Upper = collect_left(Max, Tree, 2 * VSplit + 2),
